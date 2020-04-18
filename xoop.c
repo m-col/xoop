@@ -20,14 +20,7 @@ void set_window_type(xcb_window_t wid) {
     reply2 = xcb_intern_atom_reply(conn, cookie2, NULL);
 
     xcb_change_property(
-	conn,
-	XCB_PROP_MODE_REPLACE,
-	wid,
-	reply1->atom,
-	XCB_ATOM_ATOM,
-	32,
-	1,
-	&reply2->atom
+	conn, XCB_PROP_MODE_REPLACE, wid, reply1->atom, XCB_ATOM_ATOM, 32, 1, &reply2->atom
     );
     free(reply1);
     free(reply2);
@@ -40,48 +33,24 @@ void set_window_shape(xcb_window_t wid)
     xcb_pixmap_t pixmap = xcb_generate_id(conn);
 
     xcb_create_pixmap(
-	conn,
-	1,
-	pixmap,
-	wid,
-	screen->width_in_pixels,
-	screen->height_in_pixels
+	conn, 1, pixmap, wid, screen->width_in_pixels, screen->height_in_pixels
     );
 
-    const uint32_t values[] = {
-	screen->white_pixel,
-    };
+    const uint32_t values[] = {screen->white_pixel};
 
     xcb_create_gc(
-	conn,
-	gc,
-	pixmap,
-	XCB_GC_FOREGROUND,
-	values
+	conn, gc, pixmap, XCB_GC_FOREGROUND, values
     );
 
     xcb_rectangle_t rect = {
-	1,
-	1,
-	screen->width_in_pixels - 2,
-	screen->height_in_pixels - 2
+	1, 1, screen->width_in_pixels - 2, screen->height_in_pixels - 2
     };
     xcb_poly_fill_rectangle(
-	conn,
-	pixmap,
-	gc,
-	1,
-	&rect
+	conn, pixmap, gc, 1, &rect
     );
 
     xcb_shape_mask(
-	conn,
-	XCB_SHAPE_SO_SUBTRACT,
-        XCB_SHAPE_SK_INPUT,
-	wid,
-	0,
-        0,
-	pixmap
+	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap
     );
 
     xcb_free_gc(conn, gc);
@@ -119,14 +88,7 @@ xcb_window_t setup_window()
     xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, &above);
 
     xcb_change_property(
-	conn,
-	XCB_PROP_MODE_REPLACE,
-	wid,
-	XCB_ATOM_WM_NAME,
-	XCB_ATOM_STRING,
-	8,
-	4,
-	CLASS
+	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, CLASS
     );
 
     xcb_map_window(conn, wid);
