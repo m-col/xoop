@@ -1,5 +1,5 @@
-OUT        = xinf
-SRC 	   = xinf.c
+OUT        = xoop
+SRC 	   = xoop.c
 CFLAGS 	  += -Wall -Wextra -pedantic -lxcb
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin
@@ -14,7 +14,7 @@ install:
 	cp -pf xinf "$(DESTDIR)$(BINPREFIX)"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINPREFIX)"/xinf
+	rm -f "$(DESTDIR)$(BINPREFIX)"/xoop
 
 
 .PHONY: all clean install uninstall

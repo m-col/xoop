@@ -92,7 +92,7 @@ xcb_window_t setup_window()
 	XCB_ATOM_STRING,
 	8,
 	4,
-	"xinf"
+	"xoop"
     );
 
     xcb_map_window(conn, wid);
