@@ -100,18 +100,44 @@ xcb_window_t setup_window()
 void event_loop()
 {
     xcb_generic_event_t *event;
+    xcb_enter_notify_event_t *entry;
+    int16_t x, y;
+
+    int16_t far_x = screen->width_in_pixels - 1;
+    int16_t far_y = screen->height_in_pixels - 1;
 
     while((event = xcb_wait_for_event(conn))) {
 	switch (event->response_type) {
 
 	    case XCB_ENTER_NOTIFY:
-	    printf("# enter window\n");
+	    entry = (xcb_enter_notify_event_t *)event;
+
+	    if (entry->event_x == 0) {
+		x = far_x;
+		y = entry->event_y;
+	    } else if (entry->event_y == 0){
+		x = entry->event_x;
+		y = far_y;
+	    } else if (entry->event_x == far_x){
+		x = 0;
+		y = entry->event_y;
+	    } else if (entry->event_y == far_y){
+		x = entry->event_x;
+		y = 0;
+	    };
+	    xcb_warp_pointer(
+		conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y
+	    );
+	    xcb_flush(conn);
+	    printf("(%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
 	    break;
 	}
 
-    free(event);
     }
+    free(event);
+    free(entry);
 }
+
 
 
 int main()
