@@ -1,9 +1,10 @@
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <xcb/xcb.h>
 #include <xcb/shape.h>
 
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 
 char *CLASS = "xoop";
 xcb_connection_t    *conn;
