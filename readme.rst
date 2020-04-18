@@ -1,4 +1,6 @@
-👉😎👉
-===
+xoop
+====
 
-xoop : loop your X cursor around the screen
+loop your X cursor around the screen
+
+👉😎👉
