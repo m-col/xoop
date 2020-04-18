@@ -6,6 +6,9 @@ BINPREFIX ?= $(PREFIX)/bin
 
 all: $(OUT)
 
+debug: CFLAGS += -g -DDEBUG
+debug: all
+
 clean:
 	$(RM) $(OUT) $(OBJ)
 
@@ -17,4 +20,4 @@ uninstall:
 	rm -f "$(DESTDIR)$(BINPREFIX)"/xoop
 
 
-.PHONY: all clean install uninstall
+.PHONY: all debug clean install uninstall

@@ -101,7 +101,8 @@ void event_loop()
 {
     xcb_generic_event_t *event;
     xcb_enter_notify_event_t *entry;
-    int16_t x, y;
+    int16_t x = 0;
+    int16_t y = 0;
 
     int16_t far_x = screen->width_in_pixels - 1;
     int16_t far_y = screen->height_in_pixels - 1;
@@ -129,7 +130,9 @@ void event_loop()
 		conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y
 	    );
 	    xcb_flush(conn);
+#ifdef DEBUG
 	    printf("(%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
+#endif
 	    break;
 	}
 
