@@ -2,33 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <xcb/xcb.h>
+#include <xcb/shape.h>
 
 
 xcb_connection_t    *conn;
 xcb_screen_t	    *screen;
-
-
-void clip_window(xcb_window_t wid)
-{
-    uint32_t mask;
-    xcb_gcontext_t  gc;
-
-    mask = XCB_GC_CLIP_ORIGIN_X | XCB_GC_CLIP_ORIGIN_Y;// | XCB_GC_CLIP_MASK
-
-    const uint32_t values[] = {
-	1,
-	1,
-    };
-
-    gc = xcb_generate_id(conn);
-    xcb_create_gc(
-	conn,
-	gc,
-	wid,
-	mask,
-	values
-    );
-}
 
 
 void set_window_type(xcb_window_t wid) {
@@ -55,12 +33,67 @@ void set_window_type(xcb_window_t wid) {
 }
 
 
+void set_window_shape(xcb_window_t wid)
+{
+    xcb_gcontext_t gc = xcb_generate_id(conn);
+    xcb_pixmap_t pixmap = xcb_generate_id(conn);
+
+    xcb_create_pixmap(
+	conn,
+	1,
+	pixmap,
+	wid,
+	screen->width_in_pixels,
+	screen->height_in_pixels
+    );
+
+    const uint32_t values[] = {
+	screen->white_pixel,
+    };
+
+    xcb_create_gc(
+	conn,
+	gc,
+	pixmap,
+	XCB_GC_FOREGROUND,
+	values
+    );
+
+    xcb_rectangle_t rect = {
+	1,
+	1,
+	screen->width_in_pixels - 2,
+	screen->height_in_pixels - 2
+    };
+    xcb_poly_fill_rectangle(
+	conn,
+	pixmap,
+	gc,
+	1,
+	&rect
+    );
+
+    xcb_shape_mask(
+	conn,
+	XCB_SHAPE_SO_SUBTRACT,
+        XCB_SHAPE_SK_INPUT,
+	wid,
+	0,
+        0,
+	pixmap
+    );
+
+    xcb_free_gc(conn, gc);
+    xcb_free_pixmap(conn, pixmap);
+}
+
+
 xcb_window_t setup_window()
 {
     xcb_window_t wid = xcb_generate_id(conn);
 
-    uint32_t mask_val = 0;
-    mask_val |= XCB_EVENT_MASK_ENTER_WINDOW;
+    uint32_t values = 0;
+    values |= XCB_EVENT_MASK_ENTER_WINDOW;
 
     xcb_create_window(
 	conn,
@@ -69,17 +102,17 @@ xcb_window_t setup_window()
 	screen->root,
 	0,
 	0,
-	1, // screen->width_in_pixels
+	screen->width_in_pixels,
 	screen->height_in_pixels,
 	0,
 	XCB_WINDOW_CLASS_INPUT_ONLY,
 	XCB_COPY_FROM_PARENT,
 	XCB_CW_EVENT_MASK,
-	&mask_val
+	&values
     );
 
     set_window_type(wid);
-    clip_window(wid);
+    set_window_shape(wid);
 
     uint32_t above = XCB_STACK_MODE_ABOVE;
     xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, &above);
@@ -110,10 +143,6 @@ void event_loop()
 
 	    case XCB_ENTER_NOTIFY:
 	    printf("# enter window\n");
-	    break;
-
-	    default:
-	    printf("# %d\n", event->response_type);
 	    break;
 	}
 
