@@ -5,6 +5,7 @@
 #include <xcb/shape.h>
 
 
+char *CLASS = "xoop";
 xcb_connection_t    *conn;
 xcb_screen_t	    *screen;
 
@@ -125,7 +126,7 @@ xcb_window_t setup_window()
 	XCB_ATOM_STRING,
 	8,
 	4,
-	"xoop"
+	CLASS
     );
 
     xcb_map_window(conn, wid);
