@@ -1,6 +1,6 @@
 OUT        = xinf
 SRC 	   = xinf.c
-CFLAGS 	  += -lX11
+CFLAGS 	  += -Wall -Wextra -pedantic -lxcb
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin
 
