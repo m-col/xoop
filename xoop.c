@@ -21,14 +21,11 @@ SOFTWARE.
 */
 
 
-#include <stdlib.h>
-#include <xcb/xcb.h>
-#include <xcb/shape.h>
-#include <unistd.h>
-
-#ifdef DEBUG
 #include <stdio.h>
-#endif
+#include <stdlib.h>
+#include <xcb/shape.h>
+#include <xcb/xcb.h>
+#include <unistd.h>
 
 #define PROGNAME "xoop"
 
