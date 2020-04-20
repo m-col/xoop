@@ -17,7 +17,7 @@ install:
 	cp -pf "$(OUT)" "$(DESTDIR)$(BINPREFIX)"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINPREFIX)"/xoop
+	rm -f "$(DESTDIR)$(BINPREFIX)/$(OUT)"
 
 
 .PHONY: all debug clean install uninstall
