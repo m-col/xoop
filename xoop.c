@@ -58,7 +58,13 @@ void set_window_type() {
         NULL
     );
     xcb_change_property(
-        conn, XCB_PROP_MODE_REPLACE, wid, reply3->atom, XCB_ATOM_INTEGER, 1, 1, (uint32_t []){ 0xFFFFFFFF }
+        conn, XCB_PROP_MODE_REPLACE, wid, reply3->atom, XCB_ATOM_INTEGER, 1, 1, (uint32_t []){0xFFFFFFFF}
+    );
+
+    xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t []){XCB_STACK_MODE_ABOVE});
+
+    xcb_change_property(
+	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, PROGNAME
     );
 
     free(reply1);
@@ -76,10 +82,8 @@ void set_window_shape()
 	conn, 1, pixmap, wid, screen->width_in_pixels, screen->height_in_pixels
     );
 
-    const uint32_t values[] = {screen->white_pixel};
-
     xcb_create_gc(
-	conn, gc, pixmap, XCB_GC_FOREGROUND, values
+	conn, gc, pixmap, XCB_GC_FOREGROUND, (uint32_t []){screen->white_pixel}
     );
 
     xcb_rectangle_t rect = {
@@ -123,13 +127,6 @@ void setup_window()
 
     set_window_type();
     set_window_shape();
-
-    uint32_t above = XCB_STACK_MODE_ABOVE;
-    xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, &above);
-
-    xcb_change_property(
-	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, PROGNAME
-    );
 
     xcb_map_window(conn, wid);
     xcb_flush(conn);
