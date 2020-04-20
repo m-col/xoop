@@ -24,6 +24,7 @@ SOFTWARE.
 #include <stdlib.h>
 #include <xcb/xcb.h>
 #include <xcb/shape.h>
+#include <unistd.h>
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -182,16 +183,37 @@ void event_loop()
 }
 
 
-int main()
+int main(int argc, char *argv[])
 {
+    int opt;
+    int to_fork = 0;
+    int pid;
     xcb_window_t wid;
+
+    while ((opt = getopt(argc, argv, "f")) != -1) {
+        switch (opt) {
+	    case 'f':
+		to_fork = 1;
+		break;
+        }
+    }
 
     conn = xcb_connect(NULL, NULL);
     if (xcb_connection_has_error(conn))
-	exit(1);
-    screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
+	exit(EXIT_FAILURE);
 
+    screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
     wid = setup_window();
+
+    if (to_fork) {
+	pid = fork();
+	if (pid > 0) {
+	    exit(EXIT_SUCCESS);
+	} else if (pid < 0) {
+	    exit(EXIT_FAILURE);
+	}
+    }
+
     event_loop();
 
     xcb_unmap_window(conn, wid);
