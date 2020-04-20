@@ -30,8 +30,8 @@ SOFTWARE.
 #include <stdio.h>
 #endif
 
+#define PROGNAME "xoop"
 
-char *CLASS = "xoop";
 xcb_connection_t    *conn;
 xcb_screen_t	    *screen;
 
@@ -129,7 +129,7 @@ xcb_window_t setup_window()
     xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, &above);
 
     xcb_change_property(
-	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, CLASS
+	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, PROGNAME
     );
 
     xcb_map_window(conn, wid);
@@ -183,6 +183,17 @@ void event_loop()
 }
 
 
+void print_help()
+{
+    printf(
+	PROGNAME " [-h|-f]\n"
+	"\n"
+	"    -h    print help\n"
+	"    -f    fork\n"
+    );
+}
+
+
 int main(int argc, char *argv[])
 {
     int opt;
@@ -190,8 +201,11 @@ int main(int argc, char *argv[])
     int pid;
     xcb_window_t wid;
 
-    while ((opt = getopt(argc, argv, "f")) != -1) {
+    while ((opt = getopt(argc, argv, "hf")) != -1) {
         switch (opt) {
+	    case 'h':
+		print_help();
+		exit(EXIT_SUCCESS);
 	    case 'f':
 		to_fork = 1;
 		break;
