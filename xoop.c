@@ -36,19 +36,34 @@ xcb_screen_t	    *screen;
 
 
 void set_window_type(xcb_window_t wid) {
-    xcb_intern_atom_cookie_t cookie1, cookie2;
-    xcb_intern_atom_reply_t *reply1, *reply2;
+    xcb_intern_atom_reply_t *reply1, *reply2, *reply3;
 
-    cookie1 = xcb_intern_atom(conn, 0, 19, "_NET_WM_WINDOW_TYPE");
-    reply1 = xcb_intern_atom_reply(conn, cookie1, NULL);
-    cookie2 = xcb_intern_atom(conn, 0, 32, "_NET_WM_WINDOW_TYPE_NOTIFICATION");
-    reply2 = xcb_intern_atom_reply(conn, cookie2, NULL);
-
+    reply1 = xcb_intern_atom_reply(
+	conn,
+	xcb_intern_atom(conn, 0, 19, "_NET_WM_WINDOW_TYPE"),
+	NULL
+    );
+    reply2 = xcb_intern_atom_reply(
+	conn,
+	xcb_intern_atom(conn, 0, 24, "_NET_WM_WINDOW_TYPE_DOCK"),
+	NULL
+    );
     xcb_change_property(
 	conn, XCB_PROP_MODE_REPLACE, wid, reply1->atom, XCB_ATOM_ATOM, 32, 1, &reply2->atom
     );
+
+    reply3 = xcb_intern_atom_reply(
+        conn,
+        xcb_intern_atom(conn, 0, 15, "_NET_WM_DESKTOP"),
+        NULL
+    );
+    xcb_change_property(
+        conn, XCB_PROP_MODE_REPLACE, wid, reply3->atom, XCB_ATOM_INTEGER, 1, 1, (uint32_t []){ 0xFFFFFFFF }
+    );
+
     free(reply1);
     free(reply2);
+    free(reply3);
 }
 
 
