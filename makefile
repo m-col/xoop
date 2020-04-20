@@ -14,7 +14,7 @@ clean:
 
 install:
 	mkdir -p "$(DESTDIR)$(BINPREFIX)"
-	cp -pf xinf "$(DESTDIR)$(BINPREFIX)"
+	cp -pf "$(OUT)" "$(DESTDIR)$(BINPREFIX)"
 
 uninstall:
 	rm -f "$(DESTDIR)$(BINPREFIX)"/xoop
