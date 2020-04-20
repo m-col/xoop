@@ -21,6 +21,7 @@ SOFTWARE.
 */
 
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <xcb/shape.h>
@@ -31,9 +32,10 @@ SOFTWARE.
 
 xcb_connection_t    *conn;
 xcb_screen_t	    *screen;
+xcb_window_t	     wid;
 
 
-void set_window_type(xcb_window_t wid) {
+void set_window_type() {
     xcb_intern_atom_reply_t *reply1, *reply2, *reply3;
 
     reply1 = xcb_intern_atom_reply(
@@ -65,7 +67,7 @@ void set_window_type(xcb_window_t wid) {
 }
 
 
-void set_window_shape(xcb_window_t wid)
+void set_window_shape()
 {
     xcb_gcontext_t gc = xcb_generate_id(conn);
     xcb_pixmap_t pixmap = xcb_generate_id(conn);
@@ -96,9 +98,9 @@ void set_window_shape(xcb_window_t wid)
 }
 
 
-xcb_window_t setup_window()
+void setup_window()
 {
-    xcb_window_t wid = xcb_generate_id(conn);
+    wid = xcb_generate_id(conn);
 
     uint32_t values = 0;
     values |= XCB_EVENT_MASK_ENTER_WINDOW;
@@ -119,8 +121,8 @@ xcb_window_t setup_window()
 	&values
     );
 
-    set_window_type(wid);
-    set_window_shape(wid);
+    set_window_type();
+    set_window_shape();
 
     uint32_t above = XCB_STACK_MODE_ABOVE;
     xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, &above);
@@ -131,7 +133,6 @@ xcb_window_t setup_window()
 
     xcb_map_window(conn, wid);
     xcb_flush(conn);
-    return wid;
 }
 
 
@@ -180,6 +181,14 @@ void event_loop()
 }
 
 
+void exit_nicely()
+{
+    xcb_unmap_window(conn, wid);
+    xcb_disconnect(conn);
+    exit(EXIT_SUCCESS);
+}
+
+
 void print_help()
 {
     printf(
@@ -196,7 +205,6 @@ int main(int argc, char *argv[])
     int opt;
     int to_fork = 0;
     int pid;
-    xcb_window_t wid;
 
     while ((opt = getopt(argc, argv, "hf")) != -1) {
         switch (opt) {
@@ -214,7 +222,11 @@ int main(int argc, char *argv[])
 	exit(EXIT_FAILURE);
 
     screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
-    wid = setup_window();
+    setup_window();
+
+    signal(SIGINT, exit_nicely);
+    signal(SIGTERM, exit_nicely);
+    signal(SIGHUP, exit_nicely);
 
     if (to_fork) {
 	pid = fork();
@@ -227,8 +239,6 @@ int main(int argc, char *argv[])
 
     event_loop();
 
-    xcb_unmap_window(conn, wid);
-    xcb_disconnect(conn);
-
+    exit_nicely(EXIT_SUCCESS);
     return 0;
 }
