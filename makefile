@@ -4,7 +4,7 @@ CFLAGS 	  += -Wall -Wextra -pedantic -lxcb -lxcb-shape
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin
 
-all: $(OUT)
+all: clean $(OUT)
 
 debug: CFLAGS += -g -DDEBUG
 debug: all
