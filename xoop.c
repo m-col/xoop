@@ -36,29 +36,29 @@ xcb_window_t	     wid;
 
 
 void set_window_type() {
-    xcb_intern_atom_reply_t *reply1, *reply2, *reply3;
+    xcb_intern_atom_reply_t *wm_window_type, *wm_window_type_dock, *wm_desktop;
 
-    reply1 = xcb_intern_atom_reply(
+    wm_window_type = xcb_intern_atom_reply(
 	conn,
 	xcb_intern_atom(conn, 0, 19, "_NET_WM_WINDOW_TYPE"),
 	NULL
     );
-    reply2 = xcb_intern_atom_reply(
+    wm_window_type_dock = xcb_intern_atom_reply(
 	conn,
 	xcb_intern_atom(conn, 0, 24, "_NET_WM_WINDOW_TYPE_DOCK"),
 	NULL
     );
     xcb_change_property(
-	conn, XCB_PROP_MODE_REPLACE, wid, reply1->atom, XCB_ATOM_ATOM, 32, 1, &reply2->atom
+	conn, XCB_PROP_MODE_REPLACE, wid, wm_window_type->atom, XCB_ATOM_ATOM, 32, 1, &wm_window_type_dock->atom
     );
 
-    reply3 = xcb_intern_atom_reply(
+    wm_desktop = xcb_intern_atom_reply(
         conn,
         xcb_intern_atom(conn, 0, 15, "_NET_WM_DESKTOP"),
         NULL
     );
     xcb_change_property(
-        conn, XCB_PROP_MODE_REPLACE, wid, reply3->atom, XCB_ATOM_INTEGER, 1, 1, (uint32_t []){0xFFFFFFFF}
+        conn, XCB_PROP_MODE_REPLACE, wid, wm_desktop->atom, XCB_ATOM_INTEGER, 1, 1, (uint32_t []){0xFFFFFFFF}
     );
 
     xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t []){XCB_STACK_MODE_ABOVE});
@@ -67,9 +67,9 @@ void set_window_type() {
 	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, PROGNAME
     );
 
-    free(reply1);
-    free(reply2);
-    free(reply3);
+    free(wm_window_type);
+    free(wm_window_type_dock);
+    free(wm_desktop);
 }
 
 
