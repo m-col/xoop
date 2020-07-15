@@ -149,6 +149,9 @@ void event_loop()
 	    case XCB_ENTER_NOTIFY:
 	    entry = (xcb_enter_notify_event_t *)event;
 
+#ifdef DEBUG
+	    printf("%d, %d\n", entry->event_x, entry->event_y);
+#endif
 	    if (entry->event_x == 0) {
 		x = far_x;
 		y = entry->event_y;
