@@ -19,6 +19,9 @@ To install:
 $ make
 $ sudo make install
 
+To uninstall:
+$ sudo make uninstall
+
 
 Caveats:
  - this won't work with multiple monitors (currently)
