@@ -75,39 +75,61 @@ void set_window_type() {
 
 void set_window_shape()
 {
-    xcb_gcontext_t gc = xcb_generate_id(conn);
     xcb_pixmap_t pixmap = xcb_generate_id(conn);
-
+    xcb_gcontext_t gc = xcb_generate_id(conn);
     xcb_create_pixmap(
 	conn, 1, pixmap, wid, screen->width_in_pixels, screen->height_in_pixels
     );
-
     xcb_create_gc(
-	conn, gc, pixmap, XCB_GC_FOREGROUND, (uint32_t []){screen->white_pixel}
+	conn, gc, pixmap, XCB_GC_FOREGROUND, &screen->white_pixel
     );
-
     xcb_rectangle_t rect = {
-	1, 1, screen->width_in_pixels - 2, screen->height_in_pixels - 2
+	0, 0, screen->width_in_pixels, screen->height_in_pixels
     };
     xcb_poly_fill_rectangle(
 	conn, pixmap, gc, 1, &rect
     );
-
     xcb_shape_mask(
-	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap
+	conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap
     );
 
-    xcb_free_gc(conn, gc);
+    xcb_pixmap_t pixmap2 = xcb_generate_id(conn);
+    xcb_gcontext_t gc2 = xcb_generate_id(conn);
+    xcb_create_pixmap(
+	conn, 1, pixmap2, wid, screen->width_in_pixels, screen->height_in_pixels
+    );
+    xcb_create_gc(
+	conn, gc2, pixmap2, XCB_GC_FOREGROUND, &screen->white_pixel
+    );
+    xcb_rectangle_t rect2 = {
+	1, 1, screen->width_in_pixels - 2, screen->height_in_pixels - 2
+    };
+    xcb_poly_fill_rectangle(
+	conn, pixmap2, gc2, 1, &rect2
+    );
+    xcb_shape_mask(
+	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap2
+    );
+
+#ifdef DEBUG
+    xcb_shape_mask(
+	conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap
+    );
+    xcb_shape_mask(
+	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap2
+    );
+#endif
+
     xcb_free_pixmap(conn, pixmap);
+    xcb_free_pixmap(conn, pixmap2);
+    xcb_free_gc(conn, gc);
+    xcb_free_gc(conn, gc2);
 }
 
 
 void setup_window()
 {
     wid = xcb_generate_id(conn);
-
-    uint32_t values = 0;
-    values |= XCB_EVENT_MASK_ENTER_WINDOW;
 
     xcb_create_window(
 	conn,
@@ -119,10 +141,17 @@ void setup_window()
 	screen->width_in_pixels,
 	screen->height_in_pixels,
 	0,
+#ifdef DEBUG
+	XCB_WINDOW_CLASS_INPUT_OUTPUT,
+	XCB_COPY_FROM_PARENT,
+	XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK,
+	(uint32_t []){screen->white_pixel, XCB_EVENT_MASK_ENTER_WINDOW}
+#else
 	XCB_WINDOW_CLASS_INPUT_ONLY,
 	XCB_COPY_FROM_PARENT,
 	XCB_CW_EVENT_MASK,
-	&values
+	(uint32_t []){XCB_EVENT_MASK_ENTER_WINDOW}
+#endif
     );
 
     set_window_type();
@@ -150,7 +179,7 @@ void event_loop()
 	    entry = (xcb_enter_notify_event_t *)event;
 
 #ifdef DEBUG
-	    printf("%d, %d\n", entry->event_x, entry->event_y);
+	    printf("Entry: %d, %d\n", entry->event_x, entry->event_y);
 #endif
 	    if (entry->event_x == 0) {
 		x = far_x;
@@ -170,7 +199,7 @@ void event_loop()
 	    );
 	    xcb_flush(conn);
 #ifdef DEBUG
-	    printf("(%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
+	    printf("Warp: (%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
 #endif
 	    break;
 	}
