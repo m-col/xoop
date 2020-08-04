@@ -9,12 +9,16 @@
                                           ██║
                                           ╚═╝
 
+
 Loop your X cursor around the screen
 
 👉😎👉
 
 
 To install:
+$ make
+$ sudo make install
 
-make
-sudo make install
+
+Caveats:
+ - this won't work with multiple monitors (currently)
