@@ -22,6 +22,7 @@ $ sudo make install
 To uninstall:
 $ sudo make uninstall
 
+This of course only works in X11 and requires libxcb.
 
 Caveats:
  - this won't work with multiple monitors (currently)
