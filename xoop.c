@@ -36,7 +36,11 @@ xcb_window_t	     wid;
 
 
 void set_window_type() {
-    xcb_intern_atom_reply_t *wm_window_type, *wm_window_type_dock, *wm_desktop;
+    xcb_intern_atom_reply_t *wm_window_type,
+			    *wm_window_type_dock,
+			    *wm_state,
+			    *wm_state_above,
+			    *wm_desktop;
 
     wm_window_type = xcb_intern_atom_reply(
 	conn,
@@ -50,6 +54,20 @@ void set_window_type() {
     );
     xcb_change_property(
 	conn, XCB_PROP_MODE_REPLACE, wid, wm_window_type->atom, XCB_ATOM_ATOM, 32, 1, &wm_window_type_dock->atom
+    );
+
+    wm_state = xcb_intern_atom_reply(
+	conn,
+	xcb_intern_atom(conn, 0, 13, "_NET_WM_STATE"),
+	NULL
+    );
+    wm_state_above = xcb_intern_atom_reply(
+	conn,
+	xcb_intern_atom(conn, 0, 19, "_NET_WM_STATE_ABOVE"),
+	NULL
+    );
+    xcb_change_property(
+	conn, XCB_PROP_MODE_REPLACE, wid, wm_state->atom, XCB_ATOM_ATOM, 32, 1, &wm_state_above->atom
     );
 
     wm_desktop = xcb_intern_atom_reply(
