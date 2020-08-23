@@ -36,6 +36,7 @@ xcb_connection_t    *conn;
 xcb_screen_t	    *screen;
 xcb_window_t	     wid;
 
+int debug = 0;
 int randr_base = 0;
 
 
@@ -121,14 +122,14 @@ void set_window_shape(uint16_t width, uint16_t height)
 	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap2
     );
 
-#ifdef DEBUG
-    xcb_shape_mask(
-	conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap
-    );
-    xcb_shape_mask(
-	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap2
-    );
-#endif
+    if (debug) {
+	xcb_shape_mask(
+	    conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap
+	);
+	xcb_shape_mask(
+	    conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap2
+	);
+    };
 
     xcb_free_pixmap(conn, pixmap);
     xcb_free_pixmap(conn, pixmap2);
@@ -139,8 +140,19 @@ void set_window_shape(uint16_t width, uint16_t height)
 
 void setup_window()
 {
-    wid = xcb_generate_id(conn);
+    int class = XCB_WINDOW_CLASS_INPUT_ONLY;
+    uint32_t value_mask = XCB_CW_EVENT_MASK;
+    uint32_t value_list[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
+    uint32_t value_list_debug[2] = {screen->white_pixel, XCB_EVENT_MASK_ENTER_WINDOW};
+    uint32_t *values = value_list;
 
+    if (debug) {
+	class = XCB_WINDOW_CLASS_INPUT_OUTPUT;
+	value_mask |= XCB_CW_BACK_PIXEL;
+	values = value_list_debug;
+    };
+
+    wid = xcb_generate_id(conn);
     xcb_create_window(
 	conn,
 	XCB_COPY_FROM_PARENT,
@@ -151,17 +163,10 @@ void setup_window()
 	screen->width_in_pixels,
 	screen->height_in_pixels,
 	0,
-#ifdef DEBUG
-	XCB_WINDOW_CLASS_INPUT_OUTPUT,
+	class,
 	XCB_COPY_FROM_PARENT,
-	XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK,
-	(uint32_t []){screen->white_pixel, XCB_EVENT_MASK_ENTER_WINDOW}
-#else
-	XCB_WINDOW_CLASS_INPUT_ONLY,
-	XCB_COPY_FROM_PARENT,
-	XCB_CW_EVENT_MASK,
-	(uint32_t []){XCB_EVENT_MASK_ENTER_WINDOW}
-#endif
+	value_mask,
+	values
     );
 
     set_window_type();
@@ -197,39 +202,37 @@ void event_loop()
 	switch (event->response_type) {
 
 	    case XCB_ENTER_NOTIFY:
-	    entry = (xcb_enter_notify_event_t *)event;
-	    if (entry->event_x == 0) {
-		x = far_x;
-		y = entry->event_y;
-	    } else if (entry->event_y == 0){
-		x = entry->event_x;
-		y = far_y;
-	    } else if (entry->event_x == far_x){
-		x = 0;
-		y = entry->event_y;
-	    } else if (entry->event_y == far_y){
-		x = entry->event_x;
-		y = 0;
-	    };
-	    xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
-#ifdef DEBUG
-	    printf("Entry: %d, %d\n", entry->event_x, entry->event_y);
-	    printf("Warp: (%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
-#endif
-	    break;
+		entry = (xcb_enter_notify_event_t *)event;
+		if (entry->event_x == 0) {
+		    x = far_x;
+		    y = entry->event_y;
+		} else if (entry->event_y == 0){
+		    x = entry->event_x;
+		    y = far_y;
+		} else if (entry->event_x == far_x){
+		    x = 0;
+		    y = entry->event_y;
+		} else if (entry->event_y == far_y){
+		    x = entry->event_x;
+		    y = 0;
+		};
+		xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
+		if (debug) {
+		    printf("Entry: %d, %d\n", entry->event_x, entry->event_y);
+		    printf("Warp: (%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
+		};
+		break;
 
 	    default:
-	    if (event->response_type == randr_base + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
-		change = (xcb_randr_screen_change_notify_event_t *)event;
-		set_window_shape(change->width, change->height);
-		far_x = change->width - 1;
-		far_y = change->height - 1;
-#ifdef DEBUG
-		printf("Screen changed.\n");
-#endif
-	    } else {
-		printf("Unknown event: %d\n", event->response_type);
-	    };
+		if (event->response_type == randr_base + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
+		    change = (xcb_randr_screen_change_notify_event_t *)event;
+		    set_window_shape(change->width, change->height);
+		    far_x = change->width - 1;
+		    far_y = change->height - 1;
+		    if (debug) printf("Screen changed.\n");
+		} else {
+		    printf("Unknown event: %d\n", event->response_type);
+		};
 
 	}
 	xcb_flush(conn);
@@ -250,10 +253,11 @@ void exit_nicely()
 void print_help()
 {
     printf(
-	PROGNAME " [-h|-f]\n"
+	PROGNAME " [-h|-f|-d]\n"
 	"\n"
 	"    -h    print help\n"
 	"    -f    fork\n"
+	"    -d    print debug information\n"
     );
 }
 
@@ -264,13 +268,16 @@ int main(int argc, char *argv[])
     int to_fork = 0;
     int pid;
 
-    while ((opt = getopt(argc, argv, "hf")) != -1) {
+    while ((opt = getopt(argc, argv, "hfd")) != -1) {
         switch (opt) {
 	    case 'h':
 		print_help();
 		exit(EXIT_SUCCESS);
 	    case 'f':
 		to_fork = 1;
+		break;
+	    case 'd':
+		debug = 1;
 		break;
         }
     }

@@ -6,9 +6,6 @@ BINPREFIX ?= $(PREFIX)/bin
 
 all: clean $(OUT)
 
-debug: CFLAGS += -g -DDEBUG
-debug: all
-
 clean:
 	$(RM) $(OUT) $(OBJ)
 
