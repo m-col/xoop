@@ -24,15 +24,19 @@ SOFTWARE.
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <xcb/randr.h>
 #include <xcb/shape.h>
 #include <xcb/xcb.h>
-#include <unistd.h>
+#include <xcb/xcb_event.h>
 
 #define PROGNAME "xoop"
 
 xcb_connection_t    *conn;
 xcb_screen_t	    *screen;
 xcb_window_t	     wid;
+
+int randr_base = 0;
 
 
 void set_window_type() {
@@ -91,40 +95,28 @@ void set_window_type() {
 }
 
 
-void set_window_shape()
+void set_window_shape(uint16_t width, uint16_t height)
 {
     xcb_pixmap_t pixmap = xcb_generate_id(conn);
     xcb_gcontext_t gc = xcb_generate_id(conn);
-    xcb_create_pixmap(
-	conn, 1, pixmap, wid, screen->width_in_pixels, screen->height_in_pixels
-    );
+    xcb_create_pixmap(conn, 1, pixmap, wid, width, height);
     xcb_create_gc(
 	conn, gc, pixmap, XCB_GC_FOREGROUND, &screen->white_pixel
     );
-    xcb_rectangle_t rect = {
-	0, 0, screen->width_in_pixels, screen->height_in_pixels
-    };
-    xcb_poly_fill_rectangle(
-	conn, pixmap, gc, 1, &rect
-    );
+    xcb_rectangle_t rect = {0, 0, width, height};
+    xcb_poly_fill_rectangle(conn, pixmap, gc, 1, &rect);
     xcb_shape_mask(
 	conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap
     );
 
     xcb_pixmap_t pixmap2 = xcb_generate_id(conn);
     xcb_gcontext_t gc2 = xcb_generate_id(conn);
-    xcb_create_pixmap(
-	conn, 1, pixmap2, wid, screen->width_in_pixels, screen->height_in_pixels
-    );
+    xcb_create_pixmap(conn, 1, pixmap2, wid, width, height);
     xcb_create_gc(
 	conn, gc2, pixmap2, XCB_GC_FOREGROUND, &screen->white_pixel
     );
-    xcb_rectangle_t rect2 = {
-	1, 1, screen->width_in_pixels - 2, screen->height_in_pixels - 2
-    };
-    xcb_poly_fill_rectangle(
-	conn, pixmap2, gc2, 1, &rect2
-    );
+    xcb_rectangle_t rect2 = {1, 1, width - 2, height - 2};
+    xcb_poly_fill_rectangle(conn, pixmap2, gc2, 1, &rect2);
     xcb_shape_mask(
 	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap2
     );
@@ -173,10 +165,18 @@ void setup_window()
     );
 
     set_window_type();
-    set_window_shape();
-
+    set_window_shape(screen->width_in_pixels, screen->height_in_pixels);
     xcb_map_window(conn, wid);
-    xcb_flush(conn);
+}
+
+
+void configure_randr()
+{
+    const xcb_query_extension_reply_t *randr = xcb_get_extension_data(conn, &xcb_randr_id);
+    if (randr->present) {
+	randr_base = randr->first_event;
+	xcb_randr_select_input(conn, screen->root, XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE);
+    };
 }
 
 
@@ -184,21 +184,20 @@ void event_loop()
 {
     xcb_generic_event_t *event;
     xcb_enter_notify_event_t *entry;
+    xcb_randr_screen_change_notify_event_t *change;
     int16_t x = 0;
     int16_t y = 0;
 
     int16_t far_x = screen->width_in_pixels - 1;
     int16_t far_y = screen->height_in_pixels - 1;
 
+    xcb_flush(conn);
+
     while((event = xcb_wait_for_event(conn))) {
 	switch (event->response_type) {
 
 	    case XCB_ENTER_NOTIFY:
 	    entry = (xcb_enter_notify_event_t *)event;
-
-#ifdef DEBUG
-	    printf("Entry: %d, %d\n", entry->event_x, entry->event_y);
-#endif
 	    if (entry->event_x == 0) {
 		x = far_x;
 		y = entry->event_y;
@@ -212,18 +211,30 @@ void event_loop()
 		x = entry->event_x;
 		y = 0;
 	    };
-	    xcb_warp_pointer(
-		conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y
-	    );
-	    xcb_flush(conn);
+	    xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
 #ifdef DEBUG
+	    printf("Entry: %d, %d\n", entry->event_x, entry->event_y);
 	    printf("Warp: (%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
 #endif
 	    break;
-	}
 
+	    default:
+	    if (event->response_type == randr_base + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
+		change = (xcb_randr_screen_change_notify_event_t *)event;
+		set_window_shape(change->width, change->height);
+		far_x = change->width - 1;
+		far_y = change->height - 1;
+#ifdef DEBUG
+		printf("Screen changed.\n");
+#endif
+	    } else {
+		printf("Unknown event: %d\n", event->response_type);
+	    };
+
+	}
+	xcb_flush(conn);
+	free(event);
     }
-    free(event);
     free(entry);
 }
 
@@ -269,6 +280,7 @@ int main(int argc, char *argv[])
 	exit(EXIT_FAILURE);
 
     screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
+    configure_randr();
     setup_window();
 
     signal(SIGINT, exit_nicely);
