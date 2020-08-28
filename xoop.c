@@ -98,6 +98,10 @@ void set_window_type() {
 
 void set_window_shape(uint16_t width, uint16_t height)
 {
+
+    uint32_t dimensions[2] = {width, height};
+    xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, dimensions);
+
     xcb_pixmap_t pixmap = xcb_generate_id(conn);
     xcb_gcontext_t gc = xcb_generate_id(conn);
     xcb_create_pixmap(conn, 1, pixmap, wid, width, height);
