@@ -38,6 +38,7 @@ xcb_window_t	     wid;
 
 int debug = 0;
 int randr_base = 0;
+uint32_t axis = 0; /* 0: both, 1: x, 2: y, 3: both specified */
 
 
 void set_window_type() {
@@ -98,7 +99,11 @@ void set_window_type() {
 
 void set_window_shape(uint16_t width, uint16_t height)
 {
-
+    if (axis == 1) {
+	height += 2;
+    } else if (axis == 2) {
+	width += 2;
+    };
     uint32_t dimensions[2] = {width, height};
     xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, dimensions);
 
@@ -156,16 +161,27 @@ void setup_window()
 	values = value_list_debug;
     };
 
+    int16_t x, y = 0;
+    uint16_t width = screen->width_in_pixels;
+    uint16_t height = screen->height_in_pixels;
+    if (axis == 1) {
+	y = -1;
+	height += 2;
+    } else if (axis == 2) {
+	x = -1;
+	width += 2;
+    };
+
     wid = xcb_generate_id(conn);
     xcb_create_window(
 	conn,
 	XCB_COPY_FROM_PARENT,
 	wid,
 	screen->root,
-	0,
-	0,
-	screen->width_in_pixels,
-	screen->height_in_pixels,
+	x,
+	y,
+	width,
+	height,
 	0,
 	class,
 	XCB_COPY_FROM_PARENT,
@@ -260,6 +276,8 @@ void print_help()
 	PROGNAME " [-h|-f|-d]\n"
 	"\n"
 	"    -h    print help\n"
+	"    -x    xoop only the x axis\n"
+	"    -y    xoop only the y axis\n"
 	"    -f    fork\n"
 	"    -d    print debug information\n"
     );
@@ -272,7 +290,7 @@ int main(int argc, char *argv[])
     int to_fork = 0;
     int pid;
 
-    while ((opt = getopt(argc, argv, "hfd")) != -1) {
+    while ((opt = getopt(argc, argv, "hfdxy")) != -1) {
         switch (opt) {
 	    case 'h':
 		print_help();
@@ -283,8 +301,19 @@ int main(int argc, char *argv[])
 	    case 'd':
 		debug = 1;
 		break;
+	    case 'x':
+		axis += 1;
+		break;
+	    case 'y':
+		axis += 2;
+		break;
         }
     }
+
+    if (axis == 3) {
+	printf("You specified -x and -y but can only specify one.\n");
+	exit(EXIT_FAILURE);
+    };
 
     conn = xcb_connect(NULL, NULL);
     if (xcb_connection_has_error(conn))
