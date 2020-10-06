@@ -1,6 +1,8 @@
 OUT        = xoop
 SRC 	   = xoop.c
-CFLAGS 	  += -Wall -Wextra -pedantic -lxcb -lxcb-shape -lxcb-randr
+CFLAGS 	  += -Wall -Wextra -pedantic \
+	     -lxcb -lxcb-shape -lxcb-randr -lxcb-xinput -lxcb-xfixes \
+	     -lX11 -lX11-xcb -lXfixes
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin
 

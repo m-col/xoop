@@ -20,7 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,244 +28,172 @@ SOFTWARE.
 #include <xcb/shape.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_event.h>
+#include <xcb/xfixes.h>
+#include <xcb/xinput.h>
+#include <X11/Xlib-xcb.h>
+#include <X11/extensions/Xfixes.h>
 
 #define PROGNAME "xoop"
 
-xcb_connection_t    *conn;
-xcb_screen_t	    *screen;
-xcb_window_t	     wid;
+Display                 *dpy;
+xcb_connection_t	*conn;
+xcb_screen_t		*screen;
+xcb_input_device_id_t	deviceid;
+PointerBarrier          barriers[4];
 
+int num_barriers = 0;
 int debug = 0;
-int randr_base = 0;
-uint32_t axis = 0; /* 0: both, 1: x, 2: y, 3: both specified */
+int axis = 0;
+const int BOTH_AXES = 0;
+const int X_ONLY = 1;
+const int Y_ONLY = 2;
+int fixes_opcode, fixes_event_base, fixes_error_base;
+uint8_t op_randr = 0;
+uint8_t op_xinput = 0;
+
+int16_t width, height;
 
 
-void set_window_type() {
-    xcb_intern_atom_reply_t *wm_window_type,
-			    *wm_window_type_dock,
-			    *wm_state,
-			    *wm_state_above,
-			    *wm_desktop;
-
-    wm_window_type = xcb_intern_atom_reply(
-	conn,
-	xcb_intern_atom(conn, 0, 19, "_NET_WM_WINDOW_TYPE"),
-	NULL
-    );
-    wm_window_type_dock = xcb_intern_atom_reply(
-	conn,
-	xcb_intern_atom(conn, 0, 24, "_NET_WM_WINDOW_TYPE_DOCK"),
-	NULL
-    );
-    xcb_change_property(
-	conn, XCB_PROP_MODE_REPLACE, wid, wm_window_type->atom, XCB_ATOM_ATOM, 32, 1, &wm_window_type_dock->atom
-    );
-
-    wm_state = xcb_intern_atom_reply(
-	conn,
-	xcb_intern_atom(conn, 0, 13, "_NET_WM_STATE"),
-	NULL
-    );
-    wm_state_above = xcb_intern_atom_reply(
-	conn,
-	xcb_intern_atom(conn, 0, 19, "_NET_WM_STATE_ABOVE"),
-	NULL
-    );
-    xcb_change_property(
-	conn, XCB_PROP_MODE_REPLACE, wid, wm_state->atom, XCB_ATOM_ATOM, 32, 1, &wm_state_above->atom
-    );
-
-    wm_desktop = xcb_intern_atom_reply(
-        conn,
-        xcb_intern_atom(conn, 0, 15, "_NET_WM_DESKTOP"),
-        NULL
-    );
-    xcb_change_property(
-        conn, XCB_PROP_MODE_REPLACE, wid, wm_desktop->atom, XCB_ATOM_INTEGER, 1, 1, (uint32_t []){0xFFFFFFFF}
-    );
-
-    xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t []){XCB_STACK_MODE_ABOVE});
-
-    xcb_change_property(
-	conn, XCB_PROP_MODE_REPLACE, wid, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, 4, PROGNAME
-    );
-
-    free(wm_window_type);
-    free(wm_window_type_dock);
-    free(wm_desktop);
+void exit_angrily(char msg[])
+{
+    fprintf(stderr, msg);
+    xcb_disconnect(conn);
+    exit(EXIT_FAILURE);
 }
 
 
-void set_window_shape(uint16_t width, uint16_t height)
+void create_barriers()
 {
-    if (axis == 1) {
-	height += 2;
-    } else if (axis == 2) {
-	width += 2;
-    };
-    uint32_t dimensions[2] = {width, height};
-    xcb_configure_window(conn, wid, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, dimensions);
+    int x1 = 0;
+    int y1 = 0;
+    int x2 = (int)width;
+    int y2 = (int)height;
 
-    xcb_pixmap_t pixmap = xcb_generate_id(conn);
-    xcb_gcontext_t gc = xcb_generate_id(conn);
-    xcb_create_pixmap(conn, 1, pixmap, wid, width, height);
-    xcb_create_gc(
-	conn, gc, pixmap, XCB_GC_FOREGROUND, &screen->white_pixel
-    );
-    xcb_rectangle_t rect = {0, 0, width, height};
-    xcb_poly_fill_rectangle(conn, pixmap, gc, 1, &rect);
-    xcb_shape_mask(
-	conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap
-    );
+    if (debug)
+	printf("Creating barriers: %i %i %i %i\n", x1, y1, x2, y2);
 
-    xcb_pixmap_t pixmap2 = xcb_generate_id(conn);
-    xcb_gcontext_t gc2 = xcb_generate_id(conn);
-    xcb_create_pixmap(conn, 1, pixmap2, wid, width, height);
-    xcb_create_gc(
-	conn, gc2, pixmap2, XCB_GC_FOREGROUND, &screen->white_pixel
-    );
-    xcb_rectangle_t rect2 = {1, 1, width - 2, height - 2};
-    xcb_poly_fill_rectangle(conn, pixmap2, gc2, 1, &rect2);
-    xcb_shape_mask(
-	conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_INPUT, wid, 0, 0, pixmap2
-    );
-
-    if (debug) {
-	xcb_shape_mask(
-	    conn, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap
-	);
-	xcb_shape_mask(
-	    conn, XCB_SHAPE_SO_SUBTRACT, XCB_SHAPE_SK_BOUNDING, wid, 0, 0, pixmap2
-	);
+    if (axis == X_ONLY || axis == BOTH_AXES) {
+	barriers[0] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x1, y1, x1, y2, 0, 0, NULL);
+	barriers[1] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x2, y1, x2, y2, 0, 0, NULL);
     };
 
-    xcb_free_pixmap(conn, pixmap);
-    xcb_free_pixmap(conn, pixmap2);
-    xcb_free_gc(conn, gc);
-    xcb_free_gc(conn, gc2);
+    if (axis == Y_ONLY || axis == BOTH_AXES) {
+	barriers[2] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x1, y1, x2, y1, 0, 0, NULL);
+	barriers[3] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x1, y2, x2, y2, 0, 0, NULL);
+    };
+    XSync(dpy, False);
 }
 
 
-void setup_window()
+void delete_barriers()
 {
-    int class = XCB_WINDOW_CLASS_INPUT_ONLY;
-    uint32_t value_mask = XCB_CW_EVENT_MASK;
-    uint32_t value_list[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
-    uint32_t value_list_debug[2] = {screen->white_pixel, XCB_EVENT_MASK_ENTER_WINDOW};
-    uint32_t *values = value_list;
-
-    if (debug) {
-	class = XCB_WINDOW_CLASS_INPUT_OUTPUT;
-	value_mask |= XCB_CW_BACK_PIXEL;
-	values = value_list_debug;
-    };
-
-    int16_t x, y = 0;
-    uint16_t width = screen->width_in_pixels;
-    uint16_t height = screen->height_in_pixels;
-    if (axis == 1) {
-	y = -1;
-	height += 2;
-    } else if (axis == 2) {
-	x = -1;
-	width += 2;
-    };
-
-    wid = xcb_generate_id(conn);
-    xcb_create_window(
-	conn,
-	XCB_COPY_FROM_PARENT,
-	wid,
-	screen->root,
-	x,
-	y,
-	width,
-	height,
-	0,
-	class,
-	XCB_COPY_FROM_PARENT,
-	value_mask,
-	values
-    );
-
-    set_window_type();
-    set_window_shape(screen->width_in_pixels, screen->height_in_pixels);
-    xcb_map_window(conn, wid);
+    for (int i = 0; i < 4; i++) {
+	if (debug)
+	    printf("Deleting barrier: %i/4\n", i + 1);
+        XFixesDestroyPointerBarrier(dpy, barriers[i]);
+    }
 }
 
 
-void configure_randr()
+void exit_nicely()
 {
-    const xcb_query_extension_reply_t *randr = xcb_get_extension_data(conn, &xcb_randr_id);
-    if (randr->present) {
-	randr_base = randr->first_event;
-	xcb_randr_select_input(conn, screen->root, XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE);
+    delete_barriers();
+    xcb_disconnect(conn);
+    exit(EXIT_SUCCESS);
+}
+
+
+void check_xfixes()
+{
+    if (
+	!XQueryExtension(dpy, "XFIXES", &fixes_opcode, &fixes_event_base, &fixes_error_base)
+    )
+	exit_angrily("XFixes extension not available.\n");
+}
+
+
+void check_randr()
+{
+    const xcb_query_extension_reply_t *ext = xcb_get_extension_data(conn, &xcb_randr_id);
+    if (!ext || !ext->present)
+        exit_angrily("Randr extension not available.\n");
+    op_randr = ext->first_event;
+    xcb_randr_select_input(conn, screen->root, XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE);
+}
+
+
+void check_xinput()
+{
+    const xcb_query_extension_reply_t *ext = xcb_get_extension_data(conn, &xcb_input_id);
+    if (!ext || !ext->present)
+        exit_angrily("XInput extension not available.\n");
+    struct {
+        xcb_input_event_mask_t head;
+        xcb_input_xi_event_mask_t mask;
+    } mask;
+    mask.head.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+    mask.head.mask_len = sizeof(mask.mask) / sizeof(uint32_t);
+    mask.mask = XCB_INPUT_XI_EVENT_MASK_BARRIER_HIT;
+    xcb_input_xi_select_events(conn, screen->root, 1, &mask.head);
+}
+
+
+void loop_cursor(xcb_generic_event_t *generic_event)
+{
+    xcb_input_barrier_hit_event_t *event = (xcb_input_barrier_hit_event_t *)generic_event;
+    int16_t x = 0;
+    int16_t y = 0;
+    int32_t far_x = width - 1;
+    int32_t far_y = height - 1;
+    int32_t ev_x = (int32_t)(event->root_x / (double)UINT16_MAX);
+    int32_t ev_y = (int32_t)(event->root_y / (double)UINT16_MAX);
+
+    if (ev_x == 0) {
+	x = far_x;
+	y = ev_y;
+    } else if (ev_y == 0){
+	x = ev_x;
+	y = far_y;
+    } else if (ev_x == far_x){
+	y = ev_y;
+    } else if (ev_y == far_y){
+	x = ev_x;
     };
+    xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
+
+    if (debug)
+	printf("Warp: (%i, %i) to (%i, %i)\n", ev_x, ev_y, x, y);
+}
+
+
+void reset_screen(xcb_generic_event_t *generic_event)
+{
+    xcb_randr_screen_change_notify_event_t *event = (xcb_randr_screen_change_notify_event_t *)generic_event;
+    width = event->width;
+    height = event->height;
+    delete_barriers();
+    create_barriers();
+    if (debug)
+	printf("Configured screens.\n");
 }
 
 
 void event_loop()
 {
     xcb_generic_event_t *event;
-    xcb_enter_notify_event_t *entry;
-    xcb_randr_screen_change_notify_event_t *change;
-    int16_t x = 0;
-    int16_t y = 0;
-
-    int16_t far_x = screen->width_in_pixels - 1;
-    int16_t far_y = screen->height_in_pixels - 1;
-
     xcb_flush(conn);
 
     while((event = xcb_wait_for_event(conn))) {
-	switch (event->response_type) {
-
-	    case XCB_ENTER_NOTIFY:
-		entry = (xcb_enter_notify_event_t *)event;
-		if (entry->event_x == 0) {
-		    x = far_x;
-		    y = entry->event_y;
-		} else if (entry->event_y == 0){
-		    x = entry->event_x;
-		    y = far_y;
-		} else if (entry->event_x == far_x){
-		    x = 0;
-		    y = entry->event_y;
-		} else if (entry->event_y == far_y){
-		    x = entry->event_x;
-		    y = 0;
-		};
-		xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
-		if (debug) {
-		    printf("Entry: %d, %d\n", entry->event_x, entry->event_y);
-		    printf("Warp: (%d, %d) to (%d, %d)\n", entry->event_x, entry->event_y, x, y);
-		};
-		break;
-
-	    default:
-		if (event->response_type == randr_base + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
-		    change = (xcb_randr_screen_change_notify_event_t *)event;
-		    set_window_shape(change->width, change->height);
-		    far_x = change->width - 1;
-		    far_y = change->height - 1;
-		    if (debug) printf("Screen changed.\n");
-		} else {
-		    printf("Unknown event: %d\n", event->response_type);
-		};
-
-	}
+	if (event->response_type == XCB_GE_GENERIC) {
+	    loop_cursor(event); /* we only receive 1 event from xinput */
+	} else if (event->response_type == op_randr + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
+	    reset_screen(event);
+	} else {
+	    printf("Unknown event: %d\n", event->response_type);
+	};
 	xcb_flush(conn);
 	free(event);
     }
-    free(entry);
-}
-
-
-void exit_nicely()
-{
-    xcb_unmap_window(conn, wid);
-    xcb_disconnect(conn);
-    exit(EXIT_SUCCESS);
 }
 
 
@@ -310,18 +237,21 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (axis == 3) {
-	printf("You specified -x and -y but can only specify one.\n");
-	exit(EXIT_FAILURE);
-    };
+    if (axis == 3)
+	axis = BOTH_AXES;
 
-    conn = xcb_connect(NULL, NULL);
+    dpy = XOpenDisplay(NULL);
+    conn = XGetXCBConnection(dpy);
     if (xcb_connection_has_error(conn))
 	exit(EXIT_FAILURE);
 
     screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
-    configure_randr();
-    setup_window();
+    width = screen->width_in_pixels;
+    height = screen->height_in_pixels;
+    check_xfixes();
+    check_randr();
+    check_xinput();
+    create_barriers();
 
     signal(SIGINT, exit_nicely);
     signal(SIGTERM, exit_nicely);
