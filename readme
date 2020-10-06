@@ -13,6 +13,11 @@ Loop your X cursor around the screen
 
 👉😎👉
 
+xoop turns your desktop into a flat torus, so that when the cursor hits one
+side it continues and reappears out from the opposite side.
+
+Here is a video demonstration: https://mcol.xyz/static/xoop.mp4
+
 
 Arguments
 ---------
