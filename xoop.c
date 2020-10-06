@@ -25,32 +25,26 @@ SOFTWARE.
 #include <stdlib.h>
 #include <unistd.h>
 #include <xcb/randr.h>
-#include <xcb/shape.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_event.h>
 #include <xcb/xfixes.h>
 #include <xcb/xinput.h>
-#include <X11/Xlib-xcb.h>
-#include <X11/extensions/Xfixes.h>
 
 #define PROGNAME "xoop"
 
-Display                 *dpy;
 xcb_connection_t	*conn;
 xcb_screen_t		*screen;
 xcb_input_device_id_t	deviceid;
-PointerBarrier          barriers[4];
+xcb_xfixes_barrier_t    barriers[4];
 
-int num_barriers = 0;
 int debug = 0;
 int axis = 0;
 const int BOTH_AXES = 0;
 const int X_ONLY = 1;
 const int Y_ONLY = 2;
-int fixes_opcode, fixes_event_base, fixes_error_base;
 uint8_t op_randr = 0;
+uint8_t op_xfixes = 0;
 uint8_t op_xinput = 0;
-
 int16_t width, height;
 
 
@@ -62,26 +56,40 @@ void exit_angrily(char msg[])
 }
 
 
+void create_barrier(xcb_xfixes_barrier_t *barrier, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
+{
+    xcb_generic_error_t *error;
+    *barrier = xcb_generate_id(conn);
+    xcb_void_cookie_t cookie = xcb_xfixes_create_pointer_barrier_checked(
+	conn, *barrier, screen->root, x1, y1, x2, y2, 0, 0, NULL
+    );
+    if ((error = xcb_request_check(conn, cookie))) {
+	free(error);
+	exit_angrily("Could not create barriers.\n");
+    }
+    free(error);
+}
+
+
 void create_barriers()
 {
-    int x1 = 0;
-    int y1 = 0;
-    int x2 = (int)width;
-    int y2 = (int)height;
+    uint16_t x1 = 0;
+    uint16_t y1 = 0;
+    uint16_t x2 = width;
+    uint16_t y2 = height;
 
     if (debug)
 	printf("Creating barriers: %i %i %i %i\n", x1, y1, x2, y2);
 
     if (axis == X_ONLY || axis == BOTH_AXES) {
-	barriers[0] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x1, y1, x1, y2, 0, 0, NULL);
-	barriers[1] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x2, y1, x2, y2, 0, 0, NULL);
+	create_barrier(&barriers[0], x1, y1, x1, y2);
+	create_barrier(&barriers[1], x2, y1, x2, y2);
     };
 
     if (axis == Y_ONLY || axis == BOTH_AXES) {
-	barriers[2] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x1, y1, x2, y1, 0, 0, NULL);
-	barriers[3] = XFixesCreatePointerBarrier(dpy, DefaultRootWindow(dpy), x1, y2, x2, y2, 0, 0, NULL);
+	create_barrier(&barriers[2], x1, y1, x2, y1);
+	create_barrier(&barriers[3], x1, y2, x2, y2);
     };
-    XSync(dpy, False);
 }
 
 
@@ -90,7 +98,8 @@ void delete_barriers()
     for (int i = 0; i < 4; i++) {
 	if (debug)
 	    printf("Deleting barrier: %i/4\n", i + 1);
-        XFixesDestroyPointerBarrier(dpy, barriers[i]);
+
+	xcb_xfixes_delete_pointer_barrier(conn, barriers[i]);
     }
 }
 
@@ -105,10 +114,13 @@ void exit_nicely()
 
 void check_xfixes()
 {
-    if (
-	!XQueryExtension(dpy, "XFIXES", &fixes_opcode, &fixes_event_base, &fixes_error_base)
-    )
-	exit_angrily("XFixes extension not available.\n");
+    xcb_xfixes_query_version(conn, 5, 0);
+    const xcb_query_extension_reply_t *ext = xcb_get_extension_data(conn, &xcb_xfixes_id);
+    if (!ext || !ext->present) {
+        printf("XFixes extension not available.\n");
+	exit(EXIT_FAILURE);
+    }
+    op_xfixes = ext->first_event;
 }
 
 
@@ -240,8 +252,7 @@ int main(int argc, char *argv[])
     if (axis == 3)
 	axis = BOTH_AXES;
 
-    dpy = XOpenDisplay(NULL);
-    conn = XGetXCBConnection(dpy);
+    conn = xcb_connect(NULL, NULL);
     if (xcb_connection_has_error(conn))
 	exit(EXIT_FAILURE);
 
@@ -268,6 +279,6 @@ int main(int argc, char *argv[])
 
     event_loop();
 
-    exit_nicely(EXIT_SUCCESS);
+    exit_nicely();
     return 0;
 }
