@@ -1,0 +1,40 @@
+.TH XOOP 1
+.SH NAME
+.B xoop
+\- loop your X cursor around the edges of the screen
+.SH SYNOPSIS
+.B xoop
+[\fB\-x\fR | \fB\-y\fR]
+[\fB\-f\fR]
+[\fB\-d\fR]
+.SH DESCRIPTION
+.B xoop
+turns your desktop into a flat torus, so that when the cursor hits one side it
+continues and reappears out from the opposite side.
+.SH OPTIONS
+.TP
+.BR \-x
+Only allow looping parallel to the x axis.
+.TP
+.BR \-y
+Only allow looping parallel to the y axis.
+.TP
+.BR \-f
+Fork the process.
+.TP
+.BR \-d
+Print extra debug information while running.
+.TP
+.BR \-h
+Print a basic help message.
+.SH MULTIMONITOR
+xoop assumes that a multiple monitor setup creates a large rectangle with 4
+edges, for example if you have two monitors of the same height side-by-side. If
+your multi-monitor setup does not produce a large rectangle then the mouse will
+only teleport on the far outside edges. This is because it is not always clear
+where the mouse should teleport to. Contributions are welcome if you have a
+solution!
+.SH MULTIMONITOR
+xoop is maintained by Matt Colligan @ \fIhttps://mcol.xyz/code/xoop\fR
+.P
+Contributions/comments @ \fImcol@posteo.net\fR
