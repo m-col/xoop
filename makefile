@@ -7,6 +7,9 @@ MANPREFIX ?= $(PREFIX)/man/man1
 
 all: clean $(OUT)
 
+xoop:
+	cc -o $(OUT) $(SRC) $(CFLAGS)
+
 clean:
 	$(RM) $(OUT) $(OBJ)
 
