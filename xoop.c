@@ -30,12 +30,14 @@ SOFTWARE.
 #include <xcb/xfixes.h>
 #include <xcb/xinput.h>
 
+#include "common.h"
+
 #define PROGNAME "xoop"
 
-xcb_connection_t	*conn;
-xcb_screen_t		*screen;
-xcb_input_device_id_t	deviceid;
-xcb_xfixes_barrier_t    barriers[4];
+xcb_connection_t        *conn;
+xcb_screen_t            *screen;
+xcb_input_device_id_t   deviceid;
+extern xcb_xfixes_barrier_t    barriers[4]; // defined in map
 
 int debug = 0;
 int axis = 0;
@@ -61,45 +63,24 @@ void create_barrier(xcb_xfixes_barrier_t *barrier, uint16_t x1, uint16_t y1, uin
     xcb_generic_error_t *error;
     *barrier = xcb_generate_id(conn);
     xcb_void_cookie_t cookie = xcb_xfixes_create_pointer_barrier_checked(
-	conn, *barrier, screen->root, x1, y1, x2, y2, 0, 0, NULL
+        conn, *barrier, screen->root, x1, y1, x2, y2, 0, 0, NULL
     );
     if ((error = xcb_request_check(conn, cookie))) {
-	free(error);
-	exit_angrily("Could not create barriers.\n");
+        free(error);
+        exit_angrily("Could not create barriers.\n");
     }
     free(error);
 }
 
 
-void create_barriers()
-{
-    uint16_t x1 = 0;
-    uint16_t y1 = 0;
-    uint16_t x2 = width;
-    uint16_t y2 = height;
-
-    if (debug)
-	printf("Creating barriers: %i %i %i %i\n", x1, y1, x2, y2);
-
-    if (axis == X_ONLY || axis == BOTH_AXES) {
-	create_barrier(&barriers[0], x1, y1, x1, y2);
-	create_barrier(&barriers[1], x2, y1, x2, y2);
-    };
-
-    if (axis == Y_ONLY || axis == BOTH_AXES) {
-	create_barrier(&barriers[2], x1, y1, x2, y1);
-	create_barrier(&barriers[3], x1, y2, x2, y2);
-    };
-}
-
-
 void delete_barriers()
 {
-    for (int i = 0; i < 4; i++) {
-	if (debug)
-	    printf("Deleting barrier: %i/4\n", i + 1);
+    uint count = sizeof(barriers);
+    for (uint i = 0; i < count; i++) {
+        if (debug)
+            printf("Deleting barrier: %i/%i\n", i + 1, count);
 
-	xcb_xfixes_delete_pointer_barrier(conn, barriers[i]);
+        xcb_xfixes_delete_pointer_barrier(conn, barriers[i]);
     }
 }
 
@@ -118,7 +99,7 @@ void check_xfixes()
     const xcb_query_extension_reply_t *ext = xcb_get_extension_data(conn, &xcb_xfixes_id);
     if (!ext || !ext->present) {
         printf("XFixes extension not available.\n");
-	exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
     op_xfixes = ext->first_event;
 }
@@ -155,26 +136,16 @@ void loop_cursor(xcb_generic_event_t *generic_event)
     xcb_input_barrier_hit_event_t *event = (xcb_input_barrier_hit_event_t *)generic_event;
     int16_t x = 0;
     int16_t y = 0;
-    int32_t far_x = width - 1;
-    int32_t far_y = height - 1;
     int32_t ev_x = (int32_t)(event->root_x / (double)UINT16_MAX);
     int32_t ev_y = (int32_t)(event->root_y / (double)UINT16_MAX);
 
-    if (ev_x == 0) {
-	x = far_x;
-	y = ev_y;
-    } else if (ev_y == 0){
-	x = ev_x;
-	y = far_y;
-    } else if (ev_x == far_x){
-	y = ev_y;
-    } else if (ev_y == far_y){
-	x = ev_x;
-    };
+    if (!map(ev_x, ev_y, &x, &y))
+        return;
+
     xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
 
     if (debug)
-	printf("Warp: (%i, %i) to (%i, %i)\n", ev_x, ev_y, x, y);
+        printf("Warp: (%i, %i) to (%i, %i)\n", ev_x, ev_y, x, y);
 }
 
 
@@ -186,7 +157,7 @@ void reset_screen(xcb_generic_event_t *generic_event)
     delete_barriers();
     create_barriers();
     if (debug)
-	printf("Configured screens.\n");
+        printf("Configured screens.\n");
 }
 
 
@@ -196,15 +167,15 @@ void event_loop()
     xcb_flush(conn);
 
     while((event = xcb_wait_for_event(conn))) {
-	if (event->response_type == XCB_GE_GENERIC) {
-	    loop_cursor(event); /* we only receive 1 event from xinput */
-	} else if (event->response_type == op_randr + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
-	    reset_screen(event);
-	} else {
-	    printf("Unknown event: %d\n", event->response_type);
-	};
-	xcb_flush(conn);
-	free(event);
+        if (event->response_type == XCB_GE_GENERIC) {
+            loop_cursor(event); /* we only receive 1 event from xinput */
+        } else if (event->response_type == op_randr + XCB_RANDR_SCREEN_CHANGE_NOTIFY) {
+            reset_screen(event);
+        } else {
+            printf("Unknown event: %d\n", event->response_type);
+        };
+        xcb_flush(conn);
+        free(event);
     }
 }
 
@@ -212,13 +183,13 @@ void event_loop()
 void print_help()
 {
     printf(
-	PROGNAME " [-h|-f|-d]\n"
-	"\n"
-	"    -h    print help\n"
-	"    -x    xoop only the x axis\n"
-	"    -y    xoop only the y axis\n"
-	"    -f    fork\n"
-	"    -d    print debug information\n"
+        PROGNAME " [-h|-f|-d]\n"
+        "\n"
+        "    -h    print help\n"
+        "    -x    xoop only the x axis\n"
+        "    -y    xoop only the y axis\n"
+        "    -f    fork\n"
+        "    -d    print debug information\n"
     );
 }
 
@@ -231,30 +202,30 @@ int main(int argc, char *argv[])
 
     while ((opt = getopt(argc, argv, "hfdxy")) != -1) {
         switch (opt) {
-	    case 'h':
-		print_help();
-		exit(EXIT_SUCCESS);
-	    case 'f':
-		to_fork = 1;
-		break;
-	    case 'd':
-		debug = 1;
-		break;
-	    case 'x':
-		axis += 1;
-		break;
-	    case 'y':
-		axis += 2;
-		break;
+            case 'h':
+                print_help();
+                exit(EXIT_SUCCESS);
+            case 'f':
+                to_fork = 1;
+                break;
+            case 'd':
+                debug = 1;
+                break;
+            case 'x':
+                axis += 1;
+                break;
+            case 'y':
+                axis += 2;
+                break;
         }
     }
 
     if (axis == 3)
-	axis = BOTH_AXES;
+        axis = BOTH_AXES;
 
     conn = xcb_connect(NULL, NULL);
     if (xcb_connection_has_error(conn))
-	exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
 
     screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
     width = screen->width_in_pixels;
@@ -269,12 +240,12 @@ int main(int argc, char *argv[])
     signal(SIGHUP, exit_nicely);
 
     if (to_fork) {
-	pid = fork();
-	if (pid > 0) {
-	    exit(EXIT_SUCCESS);
-	} else if (pid < 0) {
-	    exit(EXIT_FAILURE);
-	}
+        pid = fork();
+        if (pid > 0) {
+            exit(EXIT_SUCCESS);
+        } else if (pid < 0) {
+            exit(EXIT_FAILURE);
+        }
     }
 
     event_loop();
