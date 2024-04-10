@@ -30,12 +30,14 @@ SOFTWARE.
 #include <xcb/xfixes.h>
 #include <xcb/xinput.h>
 
+#include "common.h"
+
 #define PROGNAME "xoop"
 
 xcb_connection_t        *conn;
 xcb_screen_t            *screen;
 xcb_input_device_id_t   deviceid;
-xcb_xfixes_barrier_t    barriers[4];
+extern xcb_xfixes_barrier_t    barriers[4]; // defined in map
 
 int debug = 0;
 int axis = 0;
@@ -71,33 +73,12 @@ void create_barrier(xcb_xfixes_barrier_t *barrier, uint16_t x1, uint16_t y1, uin
 }
 
 
-void create_barriers()
-{
-    uint16_t x1 = 0;
-    uint16_t y1 = 0;
-    uint16_t x2 = width;
-    uint16_t y2 = height;
-
-    if (debug)
-        printf("Creating barriers: %i %i %i %i\n", x1, y1, x2, y2);
-
-    if (axis == X_ONLY || axis == BOTH_AXES) {
-        create_barrier(&barriers[0], x1, y1, x1, y2);
-        create_barrier(&barriers[1], x2, y1, x2, y2);
-    };
-
-    if (axis == Y_ONLY || axis == BOTH_AXES) {
-        create_barrier(&barriers[2], x1, y1, x2, y1);
-        create_barrier(&barriers[3], x1, y2, x2, y2);
-    };
-}
-
-
 void delete_barriers()
 {
-    for (int i = 0; i < 4; i++) {
+    uint count = sizeof(barriers);
+    for (uint i = 0; i < count; i++) {
         if (debug)
-            printf("Deleting barrier: %i/4\n", i + 1);
+            printf("Deleting barrier: %i/%i\n", i + 1, count);
 
         xcb_xfixes_delete_pointer_barrier(conn, barriers[i]);
     }
@@ -155,22 +136,12 @@ void loop_cursor(xcb_generic_event_t *generic_event)
     xcb_input_barrier_hit_event_t *event = (xcb_input_barrier_hit_event_t *)generic_event;
     int16_t x = 0;
     int16_t y = 0;
-    int32_t far_x = width - 1;
-    int32_t far_y = height - 1;
     int32_t ev_x = (int32_t)(event->root_x / (double)UINT16_MAX);
     int32_t ev_y = (int32_t)(event->root_y / (double)UINT16_MAX);
 
-    if (ev_x == 0) {
-        x = far_x;
-        y = ev_y;
-    } else if (ev_y == 0){
-        x = ev_x;
-        y = far_y;
-    } else if (ev_x == far_x){
-        y = ev_y;
-    } else if (ev_y == far_y){
-        x = ev_x;
-    };
+    if (!map(ev_x, ev_y, &x, &y))
+        return;
+
     xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
 
     if (debug)

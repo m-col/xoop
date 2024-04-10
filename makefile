@@ -1,5 +1,5 @@
 OUT        = xoop
-SRC 	   = xoop.c
+SRC 	   = xoop.c map_default.c
 CFLAGS 	  += -Wall -Wextra -pedantic -lxcb -lxcb-randr -lxcb-xinput -lxcb-xfixes
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin

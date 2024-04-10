@@ -29,6 +29,12 @@ Arguments
 -h  help
 
 
+Prerequisites
+-------------
+(Ubuntu)
+$ sudo apt install libxcb-randr0-dev libxcb-util-dev libxcb-xfixes0-dev libxcb-xinput-dev
+
+
 To install
 ----------
 
