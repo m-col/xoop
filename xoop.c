@@ -50,7 +50,7 @@ int16_t width, height;
 
 void exit_angrily(char msg[])
 {
-    fprintf(stderr, msg);
+    fprintf(stderr, "%s", msg);
     xcb_disconnect(conn);
     exit(EXIT_FAILURE);
 }

@@ -29,6 +29,18 @@ Arguments
 -h  help
 
 
+Required libraries
+------------------
+
+On Ubuntu 23.10, the following packages are required:
+
+$ sudo apt install \
+    libxcb-randr0-dev \
+    libxcb-util0-dev \
+    libxcb-xfixes0-dev \
+    libxcb-xinput-dev
+
+
 To install
 ----------
 
