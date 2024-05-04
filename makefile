@@ -1,6 +1,7 @@
 OUT        = xoop
-SRC 	   = xoop.c
-CFLAGS 	  += -Wall -Wextra -pedantic -lxcb -lxcb-randr -lxcb-xinput -lxcb-xfixes
+SRC        = xoop.c
+CFLAGS    += -Wall -Wextra -pedantic
+LDLIBS    += -lxcb -lxcb-randr -lxcb-xinput -lxcb-xfixes
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin
 MANPREFIX ?= $(PREFIX)/man/man1
