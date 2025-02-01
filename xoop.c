@@ -37,11 +37,10 @@ xcb_screen_t		*screen;
 xcb_input_device_id_t	deviceid;
 xcb_xfixes_barrier_t    barriers[4];
 
+enum axis_t { NO_AXIS = 0, X_AXIS = 1 << 0, Y_AXIS = 1 << 1, BOTH_AXES = X_AXIS | Y_AXIS };
+enum axis_t axis = NO_AXIS;
+
 int debug = 0;
-int axis = 0;
-const int BOTH_AXES = 0;
-const int X_ONLY = 1;
-const int Y_ONLY = 2;
 uint8_t op_randr = 0;
 uint8_t op_xfixes = 0;
 uint8_t op_xinput = 0;
@@ -81,12 +80,12 @@ void create_barriers()
     if (debug)
 	printf("Creating barriers: %i %i %i %i\n", x1, y1, x2, y2);
 
-    if (axis == X_ONLY || axis == BOTH_AXES) {
+    if (axis & X_AXIS) {
 	create_barrier(&barriers[0], x1, y1, x1, y2);
 	create_barrier(&barriers[1], x2, y1, x2, y2);
     };
 
-    if (axis == Y_ONLY || axis == BOTH_AXES) {
+    if (axis & Y_AXIS) {
 	create_barrier(&barriers[2], x1, y1, x2, y1);
 	create_barrier(&barriers[3], x1, y2, x2, y2);
     };
@@ -160,16 +159,16 @@ void loop_cursor(xcb_generic_event_t *generic_event)
     int32_t ev_x = (int32_t)(event->root_x / (double)UINT16_MAX);
     int32_t ev_y = (int32_t)(event->root_y / (double)UINT16_MAX);
 
-    if (ev_x == 0) {
-	x = far_x;
-	y = ev_y;
-    } else if (ev_y == 0){
-	x = ev_x;
-	y = far_y;
-    } else if (ev_x == far_x){
-	y = ev_y;
-    } else if (ev_y == far_y){
-	x = ev_x;
+    if (axis & X_AXIS && ev_x == 0) {
+      x = far_x;
+      y = ev_y;
+    } else if (axis & Y_AXIS && ev_y == 0){
+      x = ev_x;
+      y = far_y;
+    } else if (axis & X_AXIS && ev_x == far_x){
+      y = ev_y;
+    } else if (axis & Y_AXIS && ev_y == far_y){
+      x = ev_x;
     };
     xcb_warp_pointer(conn, XCB_NONE, screen->root, 0, 0, 0, 0, x, y);
 
@@ -241,15 +240,15 @@ int main(int argc, char *argv[])
 		debug = 1;
 		break;
 	    case 'x':
-		axis += 1;
+    axis |= X_AXIS;
 		break;
 	    case 'y':
-		axis += 2;
+    axis |= Y_AXIS;
 		break;
         }
     }
 
-    if (axis == 3)
+    if (axis == NO_AXIS)
 	axis = BOTH_AXES;
 
     conn = xcb_connect(NULL, NULL);
