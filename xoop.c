@@ -103,8 +103,9 @@ void delete_barriers()
 }
 
 
-void exit_nicely()
+void exit_nicely(int sig)
 {
+    (void)(sig); // Unused
     delete_barriers();
     xcb_disconnect(conn);
     exit(EXIT_SUCCESS);
@@ -278,6 +279,6 @@ int main(int argc, char *argv[])
 
     event_loop();
 
-    exit_nicely();
+    exit_nicely(0);
     return 0;
 }
